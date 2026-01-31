@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verdad o Reto</title>
+  <style>
+    :root {
+      --bg: #0f1220;
+      --card: #171a2e;
+      --accent: #7c7cff;
+      --accent2: #ff7cc8;
+      --text: #f2f3ff;
+      --muted: #a7a9d6;
+      --ok: #3ddc97;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(1200px 600px at 10% -10%, #1b1f46, transparent), var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    .app { width: 100%; max-width: 720px; }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)), var(--card);
+      border-radius: 18px; padding: 16px; box-shadow: 0 20px 40px rgba(0,0,0,.35);
+    }
+    h1,h2 { margin: 0 0 8px; }
+    p { color: var(--muted); }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .col { flex: 1 1 0; }
+    .btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; color: #0b0d1c; padding: 12px 14px; border-radius: 14px;
+      font-weight: 700; cursor: pointer; width: 100%;
+    }
+    .btn.secondary { background: #22255a; color: var(--text); }
+    .btn.ghost { background: transparent; border: 1px dashed #3a3f8f; color: var(--text); }
+    .btn.ok { background: linear-gradient(135deg, var(--ok), #8bffcc); }
+    input, select {
+      width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #2a2e7a;
+      background: #0d1030; color: var(--text);
+    }
+    .list { margin-top: 8px; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 999px; background: #22255a; margin: 4px; }
+    .chip b { color: #fff; }
+    .step { display: none; }
+    .step.active { display: block; }
+    .divider { height: 1px; background: #2a2e7a; margin: 12px 0; }
+    .center { text-align: center; }
+    .big { font-size: 1.2rem; }
+    .xl { font-size: 1.5rem; }
+    .badge { padding: 6px 10px; border-radius: 10px; background: #22255a; color: var(--muted); }
+    @media (max-width: 480px) {
+      .xl { font-size: 1.3rem; }
+      .btn { padding: 14px; }
+    }
+    .banner {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.banner.forced {
+  background: #b91c1c;
+  color: #fff;
+}
+
+.banner.avoidable {
+  background: #15803d;
+  color: #fff;
+}
+
+.hidden {
+  display: none;
+}
+
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="card">
+      <h1>Verdad o Reto</h1>
+      <p>Configura jugadores, elige nivel y juega por rondas.</p>
+
+```
+  <!-- Paso 1: Jugadores -->
+  <div id="stepPlayers" class="step active">
+    <h2>Jugadores</h2>
+    <p>Agrega la cantidad de personas y sus nombres.</p>
+    <div class="row">
+      <div class="col"><input id="playerName" placeholder="Nombre del jugador" /></div>
+      <div style="width:120px"><button class="btn" onclick="addPlayer()">Agregar</button></div>
+    </div>
+    <div class="list" id="playerList"></div>
+    <div class="divider"></div>
+    <button class="btn ok" onclick="confirmPlayers()">Aceptar lista</button>
+  </div>
+
+  <!-- Paso 2: Nivel -->
+  <div id="stepLevel" class="step">
+    <h2>Nivel</h2>
+    <p>Selecciona la intensidad.</p>
+    <select id="levelSelect">
+      <option value="bajo">Bajo</option>
+      <option value="medio">Medio</option>
+      <option value="alto">Alto</option>
+    </select>
+    <div class="divider"></div>
+    <button class="btn ok" onclick="startGame()">Comenzar</button>
+  </div>
+
+  <!-- Paso 3: Juego -->
+  <div id="stepGame" class="step">
+    <div class="row" style="align-items:center; justify-content:space-between">
+      <span class="badge" id="roundInfo"></span>
+      <span class="badge" id="levelInfo"></span>
+    </div>
+    <div class="divider"></div>
+    <div class="center">
+      <div class="big">Turno de</div>
+      <div class="xl" id="currentPlayer"></div>
+    </div>
+    <div id="avoidBanner" class="banner hidden"></div>
+    <div class="divider"></div>
+    <div class="row">
+      <button class="btn secondary" onclick="chooseTruth()">Verdad</button>
+      <button class="btn" onclick="chooseDare()">Reto</button>
+    </div>
+    <div class="divider"></div>
+    <div id="challengeBox" class="center"></div>
+    <div class="divider"></div>
+    <button class="btn ok" onclick="completeTurn()">Completado</button>
+  </div>
+</div>
+```
+
+  </div>
+
+  <script>
+    // ---- Datos externos ----
+    // Coloca en el mismo repo los archivos: preguntas.json y retos.json
+    let preguntas = null;
+    let retos = null;
+let isUnavoidable = false;
+function shotsByLevel() {
+  if (level === 'medio') return 2;
+  if (level === 'alto') return 3;
+  return 1;
+}
+function rollAvoidRule() {
+  const banner = $('avoidBanner');
+  banner.classList.remove('hidden', 'forced', 'avoidable');
+
+  isUnavoidable = Math.random() < 0.25; // 25%
+
+  if (isUnavoidable) {
+    banner.textContent = '🚨 Este reto no se puede evitar';
+    banner.classList.add('forced');
+  } else {
+    banner.textContent = `🍺 Si evitas, toma ${shotsByLevel()} shot(s)`;
+    banner.classList.add('avoidable');
+  }
+}
+
+    // ---- Estado ----
+    let players = [];
+    let order = [];
+    let level = 'bajo';
+    let turnIndex = 0;
+    let round = 1;
+    let usedTargetsThisRound = new Set();
+
+    // ---- Utilidades ----
+    const $ = (id) => document.getElementById(id);
+    const shuffle = (arr) => arr.map(v => [Math.random(), v]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+    const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+
+    
+    // ---- Paso 1 ----
+    function addPlayer() {
+      const name = $('playerName').value.trim();
+      if (!name) return;
+      players.push(name);
+      $('playerName').value = '';
+      renderPlayers();
+    }
+    function renderPlayers() {
+      $('playerList').innerHTML = players.map(p => `<span class="chip"><b>${p}</b></span>`).join('');
+    }
+    function confirmPlayers() {
+      if (players.length < 2) { alert('Agrega al menos 2 jugadores'); return; }
+      showStep('stepLevel');
+    }
+
+    // ---- Paso 2 ----
+    async function startGame() {
+      level = $('levelSelect').value;
+      await loadData();
+      order = shuffle([...players]);
+      turnIndex = 0; round = 1; usedTargetsThisRound.clear();
+      updateHUD();
+      showStep('stepGame');
+    }
+
+    async function loadData() {
+  if (preguntas && retos) return;
+
+  preguntas = {
+    bajo: [
+      "¿Te gusta provocar o que te provoquen?",
+      "¿Te gusta más el sexo de noche o de mañana?",
+      "¿Qué es lo primero que miras en una persona en una cita?",
+      "¿Peludo o lampiño?",
+      "¿Despacio o contra el muro?",
+      "¿Por delante o por detrás?",
+      "¿Qué tipo de ropa interior prefieres?",
+      "¿Cama, sillón o pared?",
+      "¿Parado, sentado o acostado?",
+      "¿Cómo te describirías en la cama?",
+      "¿Te gusta tomar la iniciativa?",
+      "¿Prefieres besos largos o rápidos?",
+      "¿Te excita más el contacto visual o físico?",
+      "¿Te consideras atrevido?",
+      "¿Te gusta dominar o ser dominado?",
+      "¿Te gusta el juego previo?",
+      "¿Te gusta más tocar o que te toquen?",
+      "¿Te gusta hablar durante el sexo?",
+      "¿Te gusta el silencio en la intimidad?",
+      "¿Te consideras sensual?"
+    ],
+    medio: [
+      "¿Cuál es tu pose favorita?",
+      "¿Alguna vez robaste un beso?",
+      "¿Te gusta gritar mientras tienes sexo?",
+      "¿Alguna vez mentiste a tu pareja para evitar un momento íntimo?",
+      "¿Crees que eres bueno en la cama? ¿Por qué?",
+      "¿Alguna vez me has imaginado sin ropa?",
+      "¿Has hecho o te gustaría hacer un trío?",
+      "¿Qué te gustaría que te hagan para excitarte?",
+      "¿Cuál es la mayor vergüenza que pasaste teniendo relaciones sexuales?",
+      "¿Cuál es el lugar más extraño donde lo has hecho?",
+      "¿Cuál es la mayor cantidad de veces que lo has hecho en un día?",
+      "¿Has sentido atracción por un amigo o amiga?",
+      "¿Qué te gusta que te digan mientras tienen sexo?",
+      "¿Con qué celebridad te gustaría tener algo?",
+      "¿Alguna vez te sorprendieron en la cama?",
+      "¿Te gusta experimentar cosas nuevas?",
+      "¿Te gusta que te den órdenes?",
+      "¿Te excita lo prohibido?",
+      "¿Te gusta el sexo rudo?",
+      "¿Te gusta prolongar el placer?"
+    ],
+    alto: [
+      "¿Alguna vez te grabaste teniendo sexo?",
+      "¿Alguna vez estuviste con alguien muy mayor o muy menor?",
+      "Si tuviéramos sexo ahora, ¿cómo te gustaría que fuera?",
+      "¿Cuál es tu fetiche?",
+      "¿Dejando de lado el porno, alguna vez viste a alguien teniendo sexo?",
+      "¿Tendrías relaciones con alguien de este grupo?",
+      "¿Quién es la persona más sexy aquí para ti?",
+      "¿Has estado con un desconocido?",
+      "¿A qué jugador de la mesa le darías?",
+      "¿Cómo te describirías en la cama?",
+      "¿Te gusta perder el control durante el sexo?",
+      "¿Te excita ser observado?",
+      "¿Te gusta el juego de roles?",
+      "¿Te atrae más el riesgo o la confianza?",
+      "¿Te gusta mezclar dolor y placer?",
+      "¿Te gusta ser dominante?",
+      "¿Te gusta que te controlen?",
+      "¿Te excita romper reglas?",
+      "¿Te atreverías a hacerlo aquí mismo?",
+      "¿Qué es lo más intenso que has hecho sexualmente?"
+    ]
+  };
+
+  retos = {
+    bajo: [
+      "{{actor}} hazte un selfie con {{target}}",
+      "{{actor}} baila sensual para {{target}}",
+      "{{actor}} baila bien pegado con {{target}}",
+      "{{actor}} baila tu canción favorita durante 30 segundos",
+      "{{actor}} quédate en ropa interior frente a {{target}}",
+      "{{actor}} quítate 1 prenda frente a {{target}}",
+      "{{actor}} quítate 2 prendas frente a {{target}}",
+      "{{actor}} quítate 3 prendas frente a {{target}}",
+      "{{actor}} quítate 4 prendas frente a {{target}}",
+      "{{actor}} haz 10 sentadillas en ropa interior frente a {{target}}",
+      "{{actor}} recibe cosquillas de {{target}} durante un minuto",
+      "{{actor}} dime algo al oído que me haga erizar, dirigido a {{target}}",
+      "{{actor}} escena de conquista con {{target}}",
+      "{{actor}} besa y canta tu canción favorita al mismo tiempo para {{target}}",
+      "{{actor}} dale un beso a {{target}} en la zona que indique",
+      "{{actor}} dale un beso a {{target}} en la parte que quieras",
+      "{{actor}} recibe un chupetón de {{target}}",
+      "{{actor}} da un beso apasionado a {{target}}",
+      "{{actor}} muerde a {{target}} en el labio",
+      "{{actor}} lame las orejas de {{target}}"
+    ],
+    medio: [
+      "{{actor}} haz una pose sexual con {{target}} usando ropa interior",
+      "{{actor}} haz un minuto de twerking para {{target}}",
+      "{{actor}} realiza body shots con {{target}}",
+      "{{actor}} besa a {{target}} piel con piel desde la rodilla hasta la boca",
+      "{{actor}} chupa las tetillas de {{target}}",
+      "{{actor}} quítate la ropa y baila sensual para {{target}}",
+      "{{actor}} besa a {{target}} durante 2 minutos",
+      "{{actor}} elige una zona de tu cuerpo para que {{target}} pase su lengua",
+      "{{actor}} imita tener un orgasmo frente a {{target}}",
+      "{{actor}} recorre a {{target}} a besos de pies a cabeza",
+      "{{actor}} recibe 3 nalgadas de {{target}}",
+      "{{actor}} quítale la ropa a {{target}} usando solo la boca",
+      "{{actor}} menciona cuatro palabras que te exciten dirigidas a {{target}}",
+      "{{actor}} realiza un strip tease para {{target}}",
+      "{{actor}} pasa un cubo de hielo por el cuerpo de {{target}}",
+      "{{actor}} pasa hielo boca a boca con {{target}}",
+      "{{actor}} envía una foto sugerente a alguien elegido por {{target}}",
+      "{{actor}} da un masaje erótico a {{target}} por 20 segundos",
+      "{{actor}} besa a {{target}} mirándolo fijamente",
+      "{{actor}} baila lento y provocador para {{target}}"
+    ],
+    alto: [
+      "{{actor}} actúa como esclavo de {{target}} durante un minuto",
+      "{{actor}} llama a un amigo y dile que estás excitado por culpa de {{target}}",
+      "{{actor}} usa la ropa interior de {{target}} durante una hora",
+      "{{actor}} crea una nueva posición sexual con {{target}} y nómbrala",
+      "{{actor}} {{target}} se monta como vaquero y tú actúas como caballo salvaje",
+      "{{actor}} baila desnudo para {{target}} durante 30 segundos",
+      "{{actor}} besa lentamente una zona íntima de {{target}}",
+      "{{actor}} imita un orgasmo exagerado para {{target}}",
+      "{{actor}} recorre el cuerpo de {{target}} a besos lentamente",
+      "{{actor}} grita pidiendo más nalgadas a {{target}}",
+      "{{actor}} masaje erótico prolongado a {{target}}",
+      "{{actor}} quítale completamente la ropa a {{target}} con la boca",
+      "{{actor}} body shots intensos con {{target}}",
+      "{{actor}} beso prolongado y dominante a {{target}}",
+      "{{actor}} simula una escena sexual intensa con {{target}}",
+      "{{actor}} pasa hielo por zonas íntimas de {{target}}",
+      "{{actor}} permanece desnudo frente a {{target}} por un minuto",
+      "{{actor}} da órdenes sexuales a {{target}} durante 30 segundos",
+      "{{actor}} deja que {{target}} te controle físicamente por un minuto",
+      "{{actor}} entre todos simulen una orgía incluyendo a {{target}}"
+    ]
+  };
+}
+
+
+    function updateHUD() {
+  $('currentPlayer').textContent = order[turnIndex];
+  $('roundInfo').textContent = `Ronda ${round}`;
+  $('levelInfo').textContent = `Nivel: ${level}`;
+  $('challengeBox').innerHTML = '<p class="muted">Elige Verdad o Reto</p>';
+  rollAvoidRule();
+}
+
+
+    function chooseTruth() {
+      const q = rand(preguntas[level]);
+      $('challengeBox').innerHTML = `<h2>Verdad</h2><p class="big">${q}</p>`;
+    }
+
+    function chooseDare() {
+      const actor = order[turnIndex];
+      const availableTargets = order.filter(p => p !== actor && !usedTargetsThisRound.has(p));
+      const target = availableTargets.length ? rand(availableTargets) : rand(order.filter(p=>p!==actor));
+      usedTargetsThisRound.add(target);
+      const raw = rand(retos[level]);
+      const text = raw.replaceAll('{{actor}}', actor).replaceAll('{{target}}', target);
+      $('challengeBox').innerHTML = `<h2>Reto</h2><p class="big">${text}</p>`;
+    }
+
+    function completeTurn() {
+      turnIndex++;
+      if (turnIndex >= order.length) {
+        round++;
+        turnIndex = 0;
+        usedTargetsThisRound.clear();
+        order = shuffle(order);
+      }
+      updateHUD();
+    }
+
+    function showStep(id) {
+      document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+      $(id).classList.add('active');
+    }
+
+
+
+  </script>
+
+</body>
+</html>
